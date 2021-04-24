@@ -603,6 +603,9 @@ def findVectorScalar(v0, v1):
         return z1.y / v0.z
     
 
+def lerp(a, b, t):
+    return a * (1 - t) + b * t
+
 def abs_vector(vector):
     return mathutils.Vector((abs(vector.x), abs(vector.y), abs(vector.z)))
 
@@ -635,6 +638,19 @@ def closest_axis(vector):
     else:
         return Axis.Z
     
+def create_matrix(i, j, k, translation):
+    ii = i.to_4d()
+    ii.w = 0
+    jj = j.to_4d()
+    jj.w = 0
+    kk = k.to_4d()
+    kk.w = 0
+    tt = translation.to_4d()
+    m = mathutils.Matrix([ii, jj, kk, tt])
+    m.transpose()
+    return m
+    
+
 
 def project_point_onto_plane(point, plane_pt, plane_norm):
     proj = (point - plane_pt).project(plane_norm)
@@ -704,7 +720,6 @@ def intersect_triangle(p0, p1, p2, pickOrigin, pickRay):
         return None
     
     return hitPoint
-
     
 
 
