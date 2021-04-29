@@ -431,7 +431,13 @@ class Label(Panel):
         blf.size(self.font_id, self.font_size, self.font_dpi)
         text_w, text_h = blf.dimensions(self.font_id, self.text)
         
-        return Vector((text_w, text_h))
+        w = text_w
+        h = text_h
+        if self.padding != None:
+            w += self.padding[0] + self.padding[2]
+            h += self.padding[1] + self.padding[3]
+        
+        return Vector((w, h))
 
     def draw_component(self, ctx):
 #        print("drawing panel")
@@ -457,7 +463,15 @@ class Label(Panel):
         else:
             off_y = bounds.height - text_h
         
-        ctx.draw_text(self.text, bounds.x + off_x, bounds.y + off_y + text_h)
+        x = bounds.x + off_x
+        y = bounds.y + off_y + text_h
+        
+        if self.padding != None:
+            x += self.padding[0]
+            y += self.padding[1]
+            
+        
+        ctx.draw_text(self.text, x, y)
 
 
 #----------------------------------
