@@ -17,6 +17,7 @@
 
 
 import bpy
+import sys
 #import mathutils
 from mathutils import *
 import bgl
@@ -25,6 +26,7 @@ import gpu
 from gpu_extras.batch import batch_for_shader
 from ..math.vecmath import *
 
+from enum import Enum
 
 vertices = (
     (0, 0), (1, 0),
@@ -133,11 +135,176 @@ class DrawContext2D:
 
 #----------------------------------
 
-class TextInput:
+class Layout:
+
     def __init__(self):
-        self.position = Vector((0, 0))
-        self.size = Vector((100, 100))
-        self.title = ""
+        pass
+        
+    def layout_components(self, bounds):
+        pass
+
+#----------------------------------
+
+class LayoutAxis(Enum):
+    X = 1
+    Y = 2
+
+#----------------------------------
+
+class ExpansionType(Enum):
+    EXPAND = 1
+    PREFERRED = 2
+#    MIN = 3
+#    MAX = 4
+
+
+#----------------------------------
+
+
+class LayoutBox(Layout):
+    class Info:
+        def __init__(self):
+            self.span = 0
+        
+
+    def __init__(self, axis = Axis.X):
+        super().__init__()
+        
+        self.axis = axis
+        self.children = []
+        
+    def add_child(self, child):
+        self.children.append(child)
+
+    def calc_minimum_size(self):
+        span_x = 0
+        span_y = 0
+        
+        for child in self.children:
+            child = self.children[i]
+            size = child.calc_minimum_size()
+            
+            if self.axis == Axis.X:
+                span_x += size.width
+                span_y = max(span_y, size.height)
+            else:
+                span_x = max(span_x, size.width)
+                span_y += size.height
+                
+        return Vector((span_x, span_y))
+
+    def calc_preferred_size(self):
+        span_x = 0
+        span_y = 0
+        
+        for child in self.children:
+            child = self.children[i]
+            size = child.calc_preferred_size()
+            
+            if self.axis == Axis.X:
+                span_x += size.width
+                span_y = max(span_y, size.height)
+            else:
+                span_x = max(span_x, size.width)
+                span_y += size.height
+                
+        return Vector((span_x, span_y))
+
+
+    def calc_maximum_size(self):
+        span_x = 0
+        span_y = 0
+        
+        for child in self.children:
+            child = self.children[i]
+            size = child.calc_maximum_size()
+            
+            if self.axis == Axis.X:
+                span_x += size.width
+                span_y = max(span_y, size.height)
+            else:
+                span_x = max(span_x, size.width)
+                span_y += size.height
+                
+        return Vector((span_x, span_y))
+
+    
+    def layout_components(self, bounds):
+        local_span = bounds.width if self.axis == Axis.X else bounds.height
+    
+        infoList = []
+        total_span = 0
+        
+        print("calc min")
+        
+        #Allocate min sizes first
+        for i in range(len(self.children)):
+            child = self.children[i]
+            size = child.calc_minimum_size()
+            
+            info = self.Info()
+            infoList.append(info)
+            info.span = size.x if self.axis == Axis.X else size.y
+            total_span += info.span
+
+            print("child %d: span %d" % (i, info.span))
+
+        #Expand to preferred sizes if there is room
+        print("calc pref")
+        for i in range(len(self.children)):
+            if total_span < local_span:
+                child = self.children[i]
+                size = child.calc_preferred_size()
+                pref_span = size.x if self.axis == Axis.X else size.y
+                span_remaining = local_span - total_span
+                
+                print("span_remaining " + str(span_remaining))
+                print("pref_span " + str(pref_span))
+                
+                info = infoList[i]
+                print("info.span " + str(info.span))
+                span_to_add = min(span_remaining, pref_span - info.span)
+                info.span += span_to_add
+                total_span += span_to_add
+
+                print("child %d: span %d" % (i, info.span))
+                    
+        #If there is space left, expand children with expand set
+        print("calc max")
+        for i in range(len(self.children)):
+            if total_span < local_span:
+                child = self.children[i]
+                if (self.axis == Axis.X and child.expansion_type_x == ExpansionType.EXPAND) or (self.axis == Axis.Y and child.expansion_type_y == ExpansionType.EXPAND):
+                    size = child.calc_maximum_size()
+                    max_span = size.x if self.axis == Axis.X else size.y
+                    
+                    expand_to = min(max_span, local_span - total_span)
+                    
+                    info = infoList[i]
+                    span_to_add = expand_to - info.span
+                    info.span += span_to_add
+                    total_span += span_to_add
+
+                print("child %d: span %d" % (i, info.span))
+                    
+        #Apply sizes
+        cursor_offset = 0
+        for i in range(len(self.children)):
+            child = self.children[i]
+            info = infoList[i]
+            
+            if self.axis == Axis.X:
+                child.position.x = bounds.x + cursor_offset
+                child.position.y = bounds.y
+                child.size.x = info.span
+                child.size.y = bounds.height
+            else:
+                child.position.x = bounds.x
+                child.position.y = bounds.y + cursor_offset
+                child.size.x = bounds.width
+                child.size.y = info.span
+                
+            cursor_offset += info.span
 
 #----------------------------------
 
@@ -147,24 +314,77 @@ class Panel:
         self.font_color = Vector((1, 1, 1, 1))
         self.font_dpi = 20
         self.font_size = 60
+        self.font_id = 0
+        
         self.margin = None
         self.padding = None
+        self.layout = None
+        self.size = Vector((0, 0))
+        self.maximum_size = Vector((sys.maxsize, sys.maxsize))
+        self.minimum_size = Vector((0, 0))
+        self.preferred_size = Vector((0, 0))
+        self.expansion_type_x = ExpansionType.PREFERRED
+        self.expansion_type_y = ExpansionType.PREFERRED
         
         self.position = Vector((0, 0))
+        
+    def bounds(self):
+        return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
+        
+    def calc_minimum_size(self):
+        if self.layout != None:
+            layout_size = self.layout.calc_minimum_size()
+            retSize = Vector((max(layout_size.x, self.minimum_size.x), max(layout_size.y, self.minimum_size.y)))
+            
+        else:    
+            return self.minimum_size
+    
+    def calc_preferred_size(self):
+        if self.layout != None:
+            layout_size = self.layout.calc_preferred_size()
+            retSize = Vector((max(layout_size.x, self.preferred_size.x), max(layout_size.y, self.preferred_size.y)))
+            
+        else:    
+            return self.preferred_size
+    
+    def calc_maximum_size(self):
+        if self.layout != None:
+            layout_size = self.layout.calc_maximum_size()
+            retSize = Vector((max(layout_size.x, self.maximum_size.x), max(layout_size.y, self.maximum_size.y)))
+            
+        else:    
+            return self.maximum_size
 
 #----------------------------------
 
 class Label(Panel):
-    def __init__(self):
+    def __init__(self, text = "label"):
         super().__init__()
         
         self.position = Vector((0, 0))
         self.size = Vector((100, 100))
-        self.text = "label"
+        self.text = text
 #        self.margin = Inset2D(2, 2, 2, 2)
 #        self.margin = Vector((2, 2, 2, 2))
         self.padding = Vector((2, 2, 2, 2))
+        
+        #self.preferred_size = Vector((0, ))
+        
+    def calc_preferred_size(self):
+        blf.size(self.font_id, self.font_size, self.font_dpi)
+        text_w, text_h = blf.dimensions(self.font_id, self.text)
+        
+        return Vector((text_w, text_h))
+        
 
+
+#----------------------------------
+
+class TextInput:
+    def __init__(self):
+        self.position = Vector((0, 0))
+        self.size = Vector((100, 100))
+        self.title = ""
 
 #----------------------------------
 
@@ -178,7 +398,7 @@ class FoldoutPanel(Panel):
 class Window:
     def __init__(self):
         self.position = Vector((100, 40))
-        self.size = Vector((100, 100))
+        self.size = Vector((400, 400))
         self.title = "Untitled"
         self.titleHeight = 20
         self.background_color = Vector((.5, .5, .5, 1))
@@ -187,6 +407,20 @@ class Window:
         self.font_size = 60
         
         self.dragging = False
+        
+        self.layout = LayoutBox(Axis.Y)
+        self.title_panel = Label("foo")
+        self.layout.add_child(self.title_panel)
+        self.main_panel = Panel()
+        self.layout.add_child(self.main_panel)
+        self.main_panel.expansion_type_x = ExpansionType.EXPAND
+        self.main_panel.expansion_type_y = ExpansionType.EXPAND
+        
+        self.layout.layout_components(self.bounds())
+        
+        print("title panel " + str(self.title_panel.bounds()))
+        print("main panel " + str(self.main_panel.bounds()))
+        
         
     def bounds(self):
         return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
