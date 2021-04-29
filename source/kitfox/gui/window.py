@@ -103,18 +103,14 @@ class DrawContext2D:
         
 #        print("after translate " + str(self.transform_stack[-1]))
         
-    def draw_rectangle(self, x, y, width, height):
+    def fill_rectangle(self, x, y, width, height):
         c2s = self.coords_to_screen_matrix()
         
         mXform = self.transform_matrix()
         mT = Matrix.Translation(Vector((x, y, 0)))
         mS = Matrix.Diagonal(Vector((width, height, 1, 1)))
 
-#        print("xform " + str(mXform))
-        
         m = c2s @ mXform @ mT @ mS
-        
-#        print("window mtx " + str(m))
         
         gpu.matrix.push()
         
@@ -122,9 +118,84 @@ class DrawContext2D:
 
         
         shader.bind()
-#        shader.uniform_float("color", (0, 0.5, 0.5, 1.0))
         shader.uniform_float("color", self.color)
         batch.draw(shader)
+        
+        gpu.matrix.pop()
+        
+    def fill_round_rectangle(self, x, y, width, height, radius = 0):
+        if radius <= 0:
+            fill_rectangle(x, y, width, height)
+            return
+    
+        c2s = self.coords_to_screen_matrix()
+
+        max_radius = min(width, height) / 2
+        radius = min(radius, max_radius)
+
+        circle_segs = 8
+        radian_inc = math.pi / (2 * circle_segs)
+        
+        verts = []
+        
+#        print ("+++++r rect")
+
+        verts.append((x, y + radius))
+        verts.append((x, y + height - radius))
+
+        for i in range(1, circle_segs):
+            xx = radius * math.cos(-radian_inc * i + math.pi) + x + radius 
+            yy = radius * math.sin(-radian_inc * i + math.pi) + y + height - radius 
+            verts.append((xx, yy))
+#            print("v %f %f" % (xx, yy))
+        
+        verts.append((x + radius, y + height))
+        verts.append((x + width - radius, y + height))
+
+        for i in range(1, circle_segs):
+            xx = radius * math.cos(-radian_inc * i + math.pi * 1 / 2) + x + width - radius 
+            yy = radius * math.sin(-radian_inc * i + math.pi * 1 / 2) + y + height - radius
+            verts.append((xx, yy))
+        
+        verts.append((x + width, y + height - radius))
+        verts.append((x + width, y + radius))
+
+        for i in range(1, circle_segs):
+            xx = radius * math.cos(-radian_inc * i) + x + width - radius 
+            yy = radius * math.sin(-radian_inc * i) + y + radius 
+            verts.append((xx, yy))
+        
+        verts.append((x + width - radius, y))
+        verts.append((x + radius, y))
+
+        for i in range(1, circle_segs):
+            xx = radius * math.cos(-radian_inc * i + math.pi * 3 / 2) + x + radius 
+            yy = radius * math.sin(-radian_inc * i + math.pi * 3 / 2) + y + radius 
+            verts.append((xx, yy))
+        
+        
+        # print ("-----")
+        # for v in verts:
+            # print("v %f %f" % (v[0], v[1]))
+        
+        batch_rr = batch_for_shader(shader, 'TRI_FAN', {"pos": verts})
+        
+        
+        mXform = self.transform_matrix()
+        # mT = Matrix.Translation(Vector((x, y, 0)))
+        # mS = Matrix.Diagonal(Vector((width, height, 1, 1)))
+
+#        m = c2s @ mXform @ mT @ mS
+        m = c2s @ mXform
+        
+        gpu.matrix.push()
+        
+        gpu.matrix.multiply_matrix(m)
+
+        
+        shader.bind()
+        shader.uniform_float("color", self.color)
+        batch_rr.draw(shader)
         
         gpu.matrix.pop()
 
@@ -278,7 +349,7 @@ class LayoutBox(Layout):
         
         
         #Allocate min sizes first
-        print("calc min")
+#        print("calc min")
         for i in range(len(self.children)):
             child = self.children[i]
             size = child.calc_minimum_size()
@@ -288,10 +359,10 @@ class LayoutBox(Layout):
             info.span = size.x if self.axis == Axis.X else size.y
             total_span += info.span
 
-            print("child %d: span %d" % (i, info.span))
+#            print("child %d: span %d" % (i, info.span))
 
         #Expand to preferred sizes if there is room
-        print("calc pref")
+#        print("calc pref")
         for i in range(len(self.children)):
             if total_span < local_span:
                 child = self.children[i]
@@ -299,19 +370,19 @@ class LayoutBox(Layout):
                 pref_span = size.x if self.axis == Axis.X else size.y
                 span_remaining = local_span - total_span
                 
-                print("span_remaining " + str(span_remaining))
-                print("pref_span " + str(pref_span))
+#                print("span_remaining " + str(span_remaining))
+#                print("pref_span " + str(pref_span))
                 
                 info = infoList[i]
-                print("info.span " + str(info.span))
+#                print("info.span " + str(info.span))
                 span_to_add = min(span_remaining, pref_span - info.span)
                 info.span += span_to_add
                 total_span += span_to_add
 
-                print("child %d: span %d" % (i, info.span))
+#                print("child %d: span %d" % (i, info.span))
                     
         #If there is space left, expand children with expand set
-        print("calc max")
+#        print("calc max")
         for i in range(len(self.children)):
             if total_span < local_span:
                 child = self.children[i]
@@ -326,7 +397,7 @@ class LayoutBox(Layout):
                     info.span += span_to_add
                     total_span += span_to_add
 
-                print("child %d: span %d" % (i, info.span))
+#                print("child %d: span %d" % (i, info.span))
                     
         #Apply sizes
         cursor_offset = 0
@@ -495,8 +566,8 @@ class Window:
     def __init__(self):
         self.position = Vector((100, 40))
         self.size = Vector((400, 400))
-        self.title = "Untitled"
-        self.titleHeight = 20
+#        self.__title = "Untitled"
+#        self.titleHeight = 20
         self.background_color = Vector((.5, .5, .5, 1))
         self.font_color = Vector((1, 1, 1, 1))
         self.font_dpi = 20
@@ -514,9 +585,19 @@ class Window:
         
         self.layout.layout_components(self.bounds())
         
+        self.set_title("")
 #        print("title panel " + str(self.title_panel.bounds()))
 #        print("main panel " + str(self.main_panel.bounds()))
-        
+
+    def get_title(self):
+        return self.__title
+
+    def set_title(self, title):
+        self.__title = title
+        self.title_panel.text = title
+
+    def get_main_panel(self):
+        return self.main_panel
         
     def bounds(self):
         return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
@@ -582,7 +663,8 @@ class Window:
         
         ctx.translate(self.position.x, self.position.y)
         ctx.color = self.background_color.copy()
-        ctx.draw_rectangle(0, 0, self.size.x, self.size.y)
+#        ctx.fill_rectangle(0, 0, self.size.x, self.size.y)
+        ctx.fill_round_rectangle(0, 0, self.size.x, self.size.y, 10)
 
         # #Text
         # font_id = 0  # default font
