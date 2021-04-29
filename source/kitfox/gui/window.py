@@ -45,6 +45,23 @@ batch = batch_for_shader(shader, 'TRI_FAN', {"pos": vertices})
 
 #----------------------------------
 
+class Rectangle2D:
+    
+    def __init__(self, x = 0, y = 0, width = 0, height = 0):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    
+    def contains(self, x, y):
+        return x >= self.x and x < self.x + self.width and y >= self.y and y < self.y + self.height
+        
+    def __str__(self):
+        return str(self.x) + ", " + str(self.y) + ", " + str(self.width) + ", " + str(self.height)
+    
+
+#----------------------------------
+
 class Label:
     def __init__(self):
         self.position = Vector((0, 0))
@@ -86,13 +103,46 @@ class Window:
         
         self.dragging = False
         
+    def bounds(self):
+        return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
+            
     def mouse_click(self, context, event):
+        c2s = self.coords_to_screen_matrix(context)
+        s2c = c2s.inverted()
+        mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+
+        # print ("event.mouse_region_x " + str(event.mouse_region_x))
+        # print ("event.mouse_region_y " + str(event.mouse_region_y))
+        # print ("mouse_pos " + str(mouse_pos))
+        
+        bounds = self.bounds()
+        
+        print ("bounds " + str(bounds))
+        
+        if bounds.contains(mouse_pos.x, mouse_pos.y):
+            if event.value == "PRESS":
+                self.dragging = True
+                self.mouse_down_pos = mouse_pos
+                self.start_position = self.position.copy()
+            else:
+                self.dragging = False
+            return {'consumed': True}
+    
         return {'consumed': False}
-        pass
         
     def mouse_move(self, context, event):
+        c2s = self.coords_to_screen_matrix(context)
+        s2c = c2s.inverted()
+        mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+        
+        
+        if self.dragging:
+            offset = mouse_pos - self.mouse_down_pos
+    
+            self.position = self.start_position + offset.to_2d()
+            return {'consumed': True}
+            
         return {'consumed': False}
-        pass
       
     def coords_to_screen_matrix(self, context):
         region = context.region
@@ -110,7 +160,7 @@ class Window:
     def draw(self, context):
         bgl.glDisable(bgl.GL_DEPTH_TEST)
     
-        mToScreen = self.coords_to_screen_matrix(context)
+        c2s = self.coords_to_screen_matrix(context)
         
         
         #self.draw_string(self.title, 
@@ -126,7 +176,7 @@ class Window:
         mT = Matrix.Translation(self.position.to_3d())
         mS = Matrix.Diagonal(self.size.to_4d())
         
-        m = mToScreen @ mT @ mS
+        m = c2s @ mT @ mS
         
 #        print("window mtx " + str(m))
         
@@ -153,7 +203,7 @@ class Window:
         text_x = self.position.x + (width - text_w) / 2
         text_y = self.position.y + text_h
         
-        screenPos = mToScreen @ Vector((text_x, text_y, 0, 1))
+        screenPos = c2s @ Vector((text_x, text_y, 0, 1))
         
         blf.position(font_id, screenPos.x, screenPos.y, 2)
         blf.draw(font_id, self.title)
