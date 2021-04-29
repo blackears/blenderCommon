@@ -46,7 +46,6 @@ batch = batch_for_shader(shader, 'TRI_FAN', {"pos": vertices})
 #----------------------------------
 
 class Rectangle2D:
-    
     def __init__(self, x = 0, y = 0, width = 0, height = 0):
         self.x = x
         self.y = y
@@ -58,15 +57,79 @@ class Rectangle2D:
         
     def __str__(self):
         return str(self.x) + ", " + str(self.y) + ", " + str(self.width) + ", " + str(self.height)
-    
+
 
 #----------------------------------
 
-class Label:
-    def __init__(self):
-        self.position = Vector((0, 0))
-        self.size = Vector((100, 100))
-        self.title = ""
+class DrawContext2D:
+
+    def __init__(self, blender_ctx):
+        self.blender_ctx = blender_ctx
+        
+        self.color = Vector((.5, .5, .5, 1))
+        self.font_color = Vector((1, 1, 1, 1))
+        self.font_dpi = 20
+        self.font_size = 60
+
+    # def set_color(self, color):
+        # self.color = color
+      
+    def coords_to_screen_matrix(self):
+        region = self.blender_ctx.region
+        #rv3d = context.region_data
+
+        mT = Matrix.Translation((0, region.height, 0))
+        mS = Matrix.Diagonal((1, -1, 1, 1))
+        return mT @ mS
+        
+    def draw_rectangle(self, x, y, width, height):
+        c2s = self.coords_to_screen_matrix()
+        
+        mT = Matrix.Translation(Vector((x, y, 0)))
+        mS = Matrix.Diagonal(Vector((width, height, 1, 1)))
+        
+        m = c2s @ mT @ mS
+        
+#        print("window mtx " + str(m))
+        
+        gpu.matrix.push()
+        
+        gpu.matrix.multiply_matrix(m)
+
+        
+        shader.bind()
+#        shader.uniform_float("color", (0, 0.5, 0.5, 1.0))
+        shader.uniform_float("color", self.color)
+        batch.draw(shader)
+        
+        gpu.matrix.pop()
+
+    def draw_text(self, text, x, y):
+        c2s = self.coords_to_screen_matrix()
+        
+        font_id = 0  # default font
+        blf.color(font_id, self.font_color.x, self.font_color.y, self.font_color.z, self.font_color.w)
+        blf.size(font_id, self.font_size, self.font_dpi)
+#        text_w, text_h = blf.dimensions(font_id, text)
+        
+        screenPos = c2s @ Vector((x, y, 0, 1))
+        
+        blf.position(font_id, screenPos.x, screenPos.y, 0)
+        blf.draw(font_id, text)
+        
+
+#----------------------------------
+
+# class Inset2D:
+    # def __init__(self, left = 0, top = 0, right = 0, bottom = 0):
+        # self.left = left
+        # self.top = top
+        # self.right = right
+        # self.bottom = bottom
+        
+    # def __str__(self):
+        # return str(self.left) + ", " + str(self.top) + ", " + str(self.right) + ", " + str(self.bottom)
+    
 
 #----------------------------------
 
@@ -80,12 +143,34 @@ class TextInput:
 
 class Panel:
     def __init__(self):
+        self.background_color = Vector((.5, .5, .5, 1))
+        self.font_color = Vector((1, 1, 1, 1))
+        self.font_dpi = 20
+        self.font_size = 60
+        self.margin = None
+        self.padding = None
+        
         self.position = Vector((0, 0))
+
+#----------------------------------
+
+class Label(Panel):
+    def __init__(self):
+        super().__init__()
+        
+        self.position = Vector((0, 0))
+        self.size = Vector((100, 100))
+        self.text = "label"
+#        self.margin = Inset2D(2, 2, 2, 2)
+#        self.margin = Vector((2, 2, 2, 2))
+        self.padding = Vector((2, 2, 2, 2))
+
 
 #----------------------------------
 
 class FoldoutPanel(Panel):
     def __init__(self):
+        super().__init__()
         self.position = Vector((0, 0))
 
 #----------------------------------
@@ -117,7 +202,7 @@ class Window:
         
         bounds = self.bounds()
         
-        print ("bounds " + str(bounds))
+        # print ("bounds " + str(bounds))
         
         if bounds.contains(mouse_pos.x, mouse_pos.y):
             if event.value == "PRESS":
@@ -159,6 +244,9 @@ class Window:
         
     def draw(self, context):
         bgl.glDisable(bgl.GL_DEPTH_TEST)
+        
+        ctx = DrawContext2D(context)
+        
     
         c2s = self.coords_to_screen_matrix(context)
         
@@ -173,28 +261,30 @@ class Window:
 
 
         #Background
-        mT = Matrix.Translation(self.position.to_3d())
-        mS = Matrix.Diagonal(self.size.to_4d())
+        # mT = Matrix.Translation(self.position.to_3d())
+        # mS = Matrix.Diagonal(self.size.to_4d())
         
-        m = c2s @ mT @ mS
+        # m = c2s @ mT @ mS
         
-#        print("window mtx " + str(m))
+# #        print("window mtx " + str(m))
         
-        gpu.matrix.push()
+        # gpu.matrix.push()
         
-        gpu.matrix.multiply_matrix(m)
+        # gpu.matrix.multiply_matrix(m)
 
         
-        shader.bind()
-#        shader.uniform_float("color", (0, 0.5, 0.5, 1.0))
-        shader.uniform_float("color", self.background_color)
-        batch.draw(shader)
+        # shader.bind()
+# #        shader.uniform_float("color", (0, 0.5, 0.5, 1.0))
+        # shader.uniform_float("color", self.background_color)
+        # batch.draw(shader)
         
-        gpu.matrix.pop()
+        # gpu.matrix.pop()
+        ctx.color = self.background_color.copy()
+        ctx.draw_rectangle(self.position.x, self.position.y, self.size.x, self.size.y)
 
         #Text
         font_id = 0  # default font
-        blf.color(font_id, self.font_color.x, self.font_color.y, self.font_color.z, self.font_color.w)
+#        blf.color(font_id, self.font_color.x, self.font_color.y, self.font_color.z, self.font_color.w)
         blf.size(font_id, self.font_size, self.font_dpi)
         text_w, text_h = blf.dimensions(font_id, self.title)
         
@@ -203,10 +293,12 @@ class Window:
         text_x = self.position.x + (width - text_w) / 2
         text_y = self.position.y + text_h
         
-        screenPos = c2s @ Vector((text_x, text_y, 0, 1))
+        # screenPos = c2s @ Vector((text_x, text_y, 0, 1))
         
-        blf.position(font_id, screenPos.x, screenPos.y, 2)
-        blf.draw(font_id, self.title)
+        # blf.position(font_id, screenPos.x, screenPos.y, 2)
+        # blf.draw(font_id, self.title)
+
+        ctx.draw_text(self.title, text_x, text_y)
 
         
     def handle_event(self, context, event):
