@@ -72,6 +72,9 @@ class DrawContext2D:
         self.font_color = Vector((1, 1, 1, 1))
         self.font_dpi = 20
         self.font_size = 60
+        
+        self.transform_stack = []
+        self.transform_stack.append(Matrix())
 
     # def set_color(self, color):
         # self.color = color
@@ -84,13 +87,32 @@ class DrawContext2D:
         mS = Matrix.Diagonal((1, -1, 1, 1))
         return mT @ mS
         
+    def push_transform(self):
+        m = self.transform_stack[-1].copy()
+        self.transform_stack.append(m)
+        
+    def pop_transform(self):
+        self.transform_stack.pop()
+        
+    def transform_matrix(self):
+        return self.transform_stack[-1]
+        
+    def translate(self, x, y):
+        m = self.transform_stack[-1]
+        self.transform_stack[-1] = Matrix.Translation(Vector((x, y, 0))) @ m
+        
+#        print("after translate " + str(self.transform_stack[-1]))
+        
     def draw_rectangle(self, x, y, width, height):
         c2s = self.coords_to_screen_matrix()
         
+        mXform = self.transform_matrix()
         mT = Matrix.Translation(Vector((x, y, 0)))
         mS = Matrix.Diagonal(Vector((width, height, 1, 1)))
+
+#        print("xform " + str(mXform))
         
-        m = c2s @ mT @ mS
+        m = c2s @ mXform @ mT @ mS
         
 #        print("window mtx " + str(m))
         
@@ -108,13 +130,15 @@ class DrawContext2D:
 
     def draw_text(self, text, x, y):
         c2s = self.coords_to_screen_matrix()
+
+        mXform = self.transform_matrix()
         
         font_id = 0  # default font
         blf.color(font_id, self.font_color.x, self.font_color.y, self.font_color.z, self.font_color.w)
         blf.size(font_id, self.font_size, self.font_dpi)
 #        text_w, text_h = blf.dimensions(font_id, text)
         
-        screenPos = c2s @ Vector((x, y, 0, 1))
+        screenPos = c2s @ mXform @ Vector((x, y, 0, 1))
         
         blf.position(font_id, screenPos.x, screenPos.y, 0)
         blf.draw(font_id, text)
@@ -143,11 +167,28 @@ class Layout:
     def layout_components(self, bounds):
         pass
 
+    def draw(self, ctx):
+        pass
+
 #----------------------------------
 
 class LayoutAxis(Enum):
     X = 1
     Y = 2
+
+#----------------------------------
+
+class AlignX(Enum):
+    LEFT = 1
+    CENTER = 2
+    RIGHT = 3
+
+#----------------------------------
+
+class AlignY(Enum):
+    TOP = 1
+    CENTER = 2
+    BOTTOM = 3
 
 #----------------------------------
 
@@ -235,9 +276,9 @@ class LayoutBox(Layout):
         infoList = []
         total_span = 0
         
-        print("calc min")
         
         #Allocate min sizes first
+        print("calc min")
         for i in range(len(self.children)):
             child = self.children[i]
             size = child.calc_minimum_size()
@@ -294,18 +335,22 @@ class LayoutBox(Layout):
             info = infoList[i]
             
             if self.axis == Axis.X:
-                child.position.x = bounds.x + cursor_offset
-                child.position.y = bounds.y
+                child.position.x = cursor_offset
+                child.position.y = 0
                 child.size.x = info.span
                 child.size.y = bounds.height
             else:
-                child.position.x = bounds.x
-                child.position.y = bounds.y + cursor_offset
+                child.position.x = 0
+                child.position.y = cursor_offset
                 child.size.x = bounds.width
                 child.size.y = info.span
                 
             cursor_offset += info.span
 
+    def draw(self, ctx):
+        for child in self.children:
+            child.draw(ctx)
+            
 #----------------------------------
 
 class Panel:
@@ -355,6 +400,17 @@ class Panel:
         else:    
             return self.maximum_size
 
+    def draw(self, ctx):
+        ctx.push_transform()
+        ctx.translate(self.position.x, self.position.y)
+        
+        self.draw_component(ctx)
+        
+        ctx.pop_transform()
+
+    def draw_component(self, ctx):
+        pass
+
 #----------------------------------
 
 class Label(Panel):
@@ -368,19 +424,45 @@ class Label(Panel):
 #        self.margin = Vector((2, 2, 2, 2))
         self.padding = Vector((2, 2, 2, 2))
         
-        #self.preferred_size = Vector((0, ))
+        self.align_x = AlignX.LEFT
+        self.align_y = AlignY.TOP
         
     def calc_preferred_size(self):
         blf.size(self.font_id, self.font_size, self.font_dpi)
         text_w, text_h = blf.dimensions(self.font_id, self.text)
         
         return Vector((text_w, text_h))
+
+    def draw_component(self, ctx):
+#        print("drawing panel")
+    
+        blf.size(self.font_id, self.font_size, self.font_dpi)
+        text_w, text_h = blf.dimensions(self.font_id, self.text)
         
+        bounds = self.bounds()
+
+#        print("bounds " + str(bounds))
+        
+        if self.align_x == AlignX.LEFT:
+            off_x = 0
+        elif self.align_x == AlignX.CENTER:
+            off_x = (bounds.width - text_w) / 2
+        else:
+            off_x = bounds.width - text_w
+
+        if self.align_y == AlignY.TOP:
+            off_y = 0
+        elif self.align_y == AlignY.CENTER:
+            off_y = (bounds.height - text_h) / 2
+        else:
+            off_y = bounds.height - text_h
+        
+        ctx.draw_text(self.text, bounds.x + off_x, bounds.y + off_y + text_h)
 
 
 #----------------------------------
 
-class TextInput:
+class TextInput(Panel):
     def __init__(self):
         self.position = Vector((0, 0))
         self.size = Vector((100, 100))
@@ -418,8 +500,8 @@ class Window:
         
         self.layout.layout_components(self.bounds())
         
-        print("title panel " + str(self.title_panel.bounds()))
-        print("main panel " + str(self.main_panel.bounds()))
+#        print("title panel " + str(self.title_panel.bounds()))
+#        print("main panel " + str(self.main_panel.bounds()))
         
         
     def bounds(self):
@@ -482,57 +564,27 @@ class Window:
         ctx = DrawContext2D(context)
         
     
-        c2s = self.coords_to_screen_matrix(context)
+        # c2s = self.coords_to_screen_matrix(context)
         
-        
-        #self.draw_string(self.title, 
-        # region = context.region
-        # #rv3d = context.region_data
-
-        # mT = Matrix.Translation((0, region.height, 0))
-        # mS = Matrix.Diagonal((1, -1, 1, 1))
-        # mToScreen = mT @ mS
-
-
-        #Background
-        # mT = Matrix.Translation(self.position.to_3d())
-        # mS = Matrix.Diagonal(self.size.to_4d())
-        
-        # m = c2s @ mT @ mS
-        
-# #        print("window mtx " + str(m))
-        
-        # gpu.matrix.push()
-        
-        # gpu.matrix.multiply_matrix(m)
-
-        
-        # shader.bind()
-# #        shader.uniform_float("color", (0, 0.5, 0.5, 1.0))
-        # shader.uniform_float("color", self.background_color)
-        # batch.draw(shader)
-        
-        # gpu.matrix.pop()
+        ctx.translate(self.position.x, self.position.y)
         ctx.color = self.background_color.copy()
-        ctx.draw_rectangle(self.position.x, self.position.y, self.size.x, self.size.y)
+        ctx.draw_rectangle(0, 0, self.size.x, self.size.y)
 
-        #Text
-        font_id = 0  # default font
-#        blf.color(font_id, self.font_color.x, self.font_color.y, self.font_color.z, self.font_color.w)
-        blf.size(font_id, self.font_size, self.font_dpi)
-        text_w, text_h = blf.dimensions(font_id, self.title)
+        # #Text
+        # font_id = 0  # default font
+        # blf.size(font_id, self.font_size, self.font_dpi)
+        # text_w, text_h = blf.dimensions(font_id, self.title)
         
         
-        width = self.size.x
-        text_x = self.position.x + (width - text_w) / 2
-        text_y = self.position.y + text_h
-        
-        # screenPos = c2s @ Vector((text_x, text_y, 0, 1))
-        
-        # blf.position(font_id, screenPos.x, screenPos.y, 2)
-        # blf.draw(font_id, self.title)
+        # width = self.size.x
+        # text_x = self.position.x + (width - text_w) / 2
+        # text_y = self.position.y + text_h
 
-        ctx.draw_text(self.title, text_x, text_y)
+        # ctx.draw_text(self.title, text_x, text_y)
+
+
+        #Draw panel components
+        self.layout.draw(ctx)
 
         
     def handle_event(self, context, event):
