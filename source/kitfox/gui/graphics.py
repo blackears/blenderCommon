@@ -73,6 +73,9 @@ class DrawContext2D:
     def set_font_color(self, value):
         self.font_color = value
       
+    def set_color(self, value):
+        self.color = value
+      
     def coords_to_screen_matrix(self):
         region = self.blender_ctx.region
         #rv3d = context.region_data

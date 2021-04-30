@@ -223,17 +223,27 @@ class LayoutBox(Layout):
 #                print("child %d: span %d" % (i, info.span))
                     
         #If there is space left, expand children with expand set
-#        print("calc max")
+        # print("calc max")
+        # print("local_span " + str(local_span))
+        # print("total_span " + str(total_span))
         for i in range(len(self.children)):
             if total_span < local_span:
                 child = self.children[i]
+                info = infoList[i]
+#                print("info.span " + str(info.span))
+                
                 if (self.axis == Axis.X and child.expansion_type_x == ExpansionType.EXPAND) or (self.axis == Axis.Y and child.expansion_type_y == ExpansionType.EXPAND):
                     size = child.calc_maximum_size()
                     max_span = size.x if self.axis == Axis.X else size.y
                     
-                    expand_to = min(max_span, local_span - total_span)
+                    expand_to = min(max_span, local_span - total_span + info.span)
+
+                    # print("max_span " + str(max_span))
+                    # print("expand_to " + str(expand_to))
                     
-                    info = infoList[i]
+                    # info = infoList[i]
+                    # print("info.span " + str(info.span))
+                    
                     span_to_add = expand_to - info.span
                     info.span += span_to_add
                     total_span += span_to_add
@@ -269,7 +279,12 @@ class LayoutBox(Layout):
 
 class Panel:
     def __init__(self):
-        self.background_color = Vector((.5, .5, .5, 1))
+        self.background_color = None
+        self.border_radius = 0
+        self.border_color = None
+        self.border_width = 1
+#        self.background_color = Vector((.5, .5, .5, 1))
+        
         self.font_color = Vector((1, 1, 1, 1))
         self.font_dpi = 20
         self.font_size = 50
@@ -291,6 +306,24 @@ class Panel:
         print(indent + "Panel " + str(self.bounds()))
         if self.layout != None:
             self.layout.dump(indent + " ")
+      
+    def set_expansion_x(self, value):
+        self.expansion_type_x = value
+      
+    def set_expansion_y(self, value):
+        self.expansion_type_y = value
+      
+    def set_background_color(self, value):
+        self.background_color = value
+      
+    def set_border_color(self, value):
+        self.border_color = value
+      
+    def set_border_radius(self, value):
+        self.border_radius = value
+      
+    def set_border_width(self, value):
+        self.border_width = value
       
     def set_font_size(self, size):
         self.font_size = size
@@ -351,7 +384,25 @@ class Panel:
         ctx.pop_transform()
 
     def draw_component(self, ctx):
-        pass
+        if self.background_color != None:
+            x = 0
+            y = 0
+            w = self.size[0]
+            h = self.size[1]
+            
+            if self.margin != None:
+                x += self.margin[0]
+                y += self.margin[1]
+                w -= self.margin[0] + self.margin[2]
+                h -= self.margin[1] + self.margin[3]
+                
+            # if self.padding != None:
+                # x -= self.padding[0] + self.padding[2]
+                # y -= self.padding[1] + self.padding[3]
+                
+            ctx.set_color(self.background_color)
+            ctx.fill_round_rectangle(x, y, w, h, self.border_radius)
+
 
 #----------------------------------
 
@@ -363,11 +414,20 @@ class Label(Panel):
         self.size = Vector((100, 100))
         self.text = text
 #        self.margin = Inset2D(2, 2, 2, 2)
-#        self.margin = Vector((2, 2, 2, 2))
+        self.margin = Vector((2, 2, 2, 2))
         self.padding = Vector((2, 2, 2, 2))
         
         self.align_x = AlignX.LEFT
         self.align_y = AlignY.TOP
+
+    def set_text(self, value):
+        self.text = value
+
+    def set_align_x(self, value):
+        self.align_x = value
+
+    def set_align_y(self, value):
+        self.align_y = value
         
     def calc_preferred_size(self):
         blf.size(self.font_id, self.font_size, self.font_dpi)
@@ -380,6 +440,11 @@ class Label(Panel):
         
         w = text_w
         h = text_h
+
+        if self.margin != None:
+            w += self.margin[0] + self.margin[2]
+            h += self.margin[1] + self.margin[3]
+        
         if self.padding != None:
             w += self.padding[0] + self.padding[2]
             h += self.padding[1] + self.padding[3]
@@ -388,6 +453,7 @@ class Label(Panel):
 
     def draw_component(self, ctx):
 #        print("drawing panel")
+        super().draw_component(ctx)
     
         blf.size(self.font_id, self.font_size, self.font_dpi)
         text_w, text_h = blf.dimensions(self.font_id, self.text)
@@ -413,10 +479,28 @@ class Label(Panel):
         x = off_x
         y = off_y + text_h
         
+        if self.margin != None:
+            if self.align_x == AlignX.LEFT:
+                x += self.margin[0]
+            elif self.align_x == AlignX.RIGHT:
+                x -= self.margin[0]
+                
+            if self.align_y == AlignY.TOP:
+                y += self.margin[1]
+            elif self.align_y == AlignY.BOTTOM:
+                y -= self.margin[1]
+        
         if self.padding != None:
-            x += self.padding[0]
-            y += self.padding[1]
-            
+            if self.align_x == AlignX.LEFT:
+                x += self.padding[0]
+            elif self.align_y == AlignX.RIGHT:
+                x -= self.padding[0]
+                
+            if self.align_y == AlignY.TOP:
+                y += self.padding[1]
+            elif self.align_y == AlignY.BOTTOM:
+                y -= self.padding[1]
+                
         ctx.set_font_size(self.font_size)
         ctx.set_font_dpi(self.font_dpi)
         ctx.set_font_color(self.font_color)
