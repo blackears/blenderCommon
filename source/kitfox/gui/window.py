@@ -410,8 +410,8 @@ class Label(Panel):
         else:
             off_y = bounds.height - text_h
         
-        x = bounds.x + off_x
-        y = bounds.y + off_y + text_h
+        x = off_x
+        y = off_y + text_h
         
         if self.padding != None:
             x += self.padding[0]
