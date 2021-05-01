@@ -219,27 +219,43 @@ class Panel:
             return self.parnt_layout.get_parent()
         return None
 
-    def mouse_pressed(self, event):
+    #Get the child panel that exists at the given position
+    def pick_panel_stack(self, pos):
         if self.layout != None:
-            result = self.layout.mouse_pressed(event)
-            if result:
-                return True
+            return self.layout.pick_panel_stack(pos)
+            
+        return []
+    
+
+    def mouse_pressed(self, event):
+        # if self.layout != None:
+            # result = self.layout.mouse_pressed(event)
+            # if result:
+                # return True
             
         return False
         
     def mouse_released(self, event):
-        if self.layout != None:
-            result = self.layout.mouse_released(event)
-            if result:
-                return True
+        # if self.layout != None:
+            # result = self.layout.mouse_released(event)
+            # if result:
+                # return True
                 
         return False
         
     def mouse_moved(self, event):
-        if self.layout != None:
-            result = self.layout.mouse_moved(event)
-            if result:
-                return True
+        # if self.layout != None:
+            # result = self.layout.mouse_moved(event)
+            # if result:
+                # return True
+                
+        return False
+        
+    def mouse_dragged(self, event):
+        # if self.layout != None:
+            # result = self.layout.mouse_dragged(event)
+            # if result:
+                # return True
                 
         return False
         

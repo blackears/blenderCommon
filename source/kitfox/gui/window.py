@@ -60,7 +60,6 @@ class FoldoutPanel(Panel):
 
 
 
-
 #----------------------------------
 
 class TitleBar(Label):
@@ -88,7 +87,7 @@ class TitleBar(Label):
         # print("event.screen_pos" + str(event.screen_pos))
         return True
         
-    def mouse_moved(self, event):
+    def mouse_dragged(self, event):
         if self.dragging:
             offset = event.screen_pos - self.drag_start
             self.window.position = self.window_start + offset
@@ -143,6 +142,27 @@ class TitleBar(Label):
 
 #----------------------------------
 
+class PanelStack:
+    def __init__(self, stack):
+        self.stack = stack
+        
+    # def add(self, panel):
+        # self.stack.append(panel)
+        
+    def window_to_local(self, window_pos):
+        local_pos = window_pos.copy()
+        for panel in self.stack:
+            local_pos -= panel.position
+        return local_pos
+
+    def __str__(self):
+        strn = ""
+        for panel in self.stack:
+            strn += "panel bounds " + str(panel.bounds()) + "\n"
+        return strn
+
+#----------------------------------
+
 class Window:
     def __init__(self):
         self.position = Vector((100, 40))
@@ -178,7 +198,11 @@ class Window:
 
         self.layout.layout_components(self.bounds())
         
-        self.mouse_capture = False
+        #self.mouse_capture = False
+        #self.captured_panel = None
+        
+        #Track mouse press events
+        self.captured_panel_stack = None
 
     def get_title(self):
         return self.__title
@@ -289,77 +313,127 @@ class Window:
         screen_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
         return screen_pos.to_2d()
         
+    def window_to_local(self, window_pos):
+        local_pos = window_pos.copy()
+        for panel in stack:
+            local_pos -= panel.position
+        return local_pos
+        
     def handle_event(self, context, event):
         bounds = self.bounds()
 
-        # if event.type == 'LEFTMOUSE':
-            # mouse_pos = self.mouse_pos(context, event)
-            
-            
-            # if self.capture_panel != None:
-                
-            # elif bounds.contains(mouse_pos[0], mouse_pos[1]):
-                # evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+#        print("event typ:" + event.type + " val: " + event.value)
 
-                # if event.value == "PRESS":
-                    # panel_stack = self.layout.pick_panel(mouse_pos)
-                    
-                    # local_pos = mouse_pos - self.position
-                    # for panel in panel_stack:
-                        
-                        
-    
         if event.type == 'LEFTMOUSE':
             mouse_pos = self.mouse_pos(context, event)
-            if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
-                evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+            mouse_window_pos = mouse_pos - self.position
+            
+            if self.captured_panel_stack != None:
+            
+ #               print("panel stack is captured")
+                
+                if event.value == "RELEASE":
+#                    print("RELEASE stack \n" + str(self.captured_panel_stack))
+                
+                    local_pos = self.captured_panel_stack.window_to_local(mouse_window_pos)
+                    evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = local_pos, screen_pos = mouse_pos)
+                    
+                    self.captured_panel_stack.stack[-1].mouse_released(evt)
+                    self.captured_panel_stack = None
+                
+            elif bounds.contains(mouse_pos[0], mouse_pos[1]):
+                #evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
 
                 if event.value == "PRESS":
-#                    print("--left mouse pressed")
-                    self.layout.mouse_pressed(evt)
-                    self.mouse_capture = True
-                else:
-                    self.layout.mouse_released(evt)
-                    self.mouse_capture = False
+                    stack = self.layout.pick_panel_stack(mouse_window_pos)
+                    self.captured_panel_stack = PanelStack(stack)
+                    
+                    
+#                    print("self.captured_panel_stack \n" + str(self.captured_panel_stack))
+                    
+                    local_pos = self.captured_panel_stack.window_to_local(mouse_window_pos)
+#                    local_pos = mouse_window_pos.copy()
+#                    # for panel in panel_stack:
+                        # local_pos -= panel.position
+                    evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = local_pos, screen_pos = mouse_pos)
+                    self.captured_panel_stack.stack[-1].mouse_pressed(evt)
                 
-                #All mouse events within window bounds return True
-                return True
+                # else:
+                    # panel_stack.stack[-1].mouse_released(evt)
+                    # self.captured_panel = None
+                      
+            return True
     
-        elif event.type == 'RIGHTMOUSE':
-            mouse_pos = self.mouse_pos(context, event)
-            if bounds.contains(mouse_pos[0], mouse_pos[1]):
-                evt = MouseButtonEvent(mouse_button = MouseButton.RIGHT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
-
-                if event.value == "PRESS":
-                    self.layout.mouse_pressed(evt)
-                else:
-                    self.layout.mouse_released(evt)
-                
-                #All mouse events within window bounds return True
-                return True
-    
-        elif event.type == 'MIDDLEMOUSE':
-            mouse_pos = self.mouse_pos(context, event)
-            if bounds.contains(mouse_pos[0], mouse_pos[1]):
-                evt = MouseButtonEvent(mouse_button = MouseButton.MIDDLE, pos = mouse_pos - self.position, screen_pos = mouse_pos)
-
-                if event.value == "PRESS":
-                    self.layout.mouse_pressed(evt)
-                else:
-                    self.layout.mouse_released(evt)
-                
-                #All mouse events within window bounds return True
-                return True
         
         elif event.type == 'MOUSEMOVE':
             mouse_pos = self.mouse_pos(context, event)
-            if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
-                evt = MouseButtonEvent(mouse_button = MouseButton.UNKNOWN, pos = mouse_pos - self.position, screen_pos = mouse_pos)
-
-                self.layout.mouse_moved(evt)
+            mouse_window_pos = mouse_pos - self.position
+            
+            if self.captured_panel_stack != None:
+#                print("mouse DRAG")
+                local_pos = self.captured_panel_stack.window_to_local(mouse_window_pos)
+                evt = MouseButtonEvent(mouse_button = MouseButton.UNKNOWN, pos = local_pos, screen_pos = mouse_pos)
                 
-                #All mouse events within window bounds return True
-                return True
+                self.captured_panel_stack.stack[-1].mouse_dragged(evt)
+            
+            elif bounds.contains(mouse_pos[0], mouse_pos[1]):
+#                print("mouse MOVE")
+                stack = self.layout.pick_panel_stack(mouse_window_pos)
+                stack = PanelStack(stack)
+                
+                local_pos = stack.window_to_local(mouse_window_pos)
+                evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = local_pos, screen_pos = mouse_pos)
+                stack.stack[-1].mouse_moved(evt)
+            
+            # if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
+                # evt = MouseButtonEvent(mouse_button = MouseButton.UNKNOWN, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                # self.layout.mouse_moved(evt)
+                
+                # #All mouse events within window bounds return True
+                # return True
+                
+        # if event.type == 'LEFTMOUSE':
+            # mouse_pos = self.mouse_pos(context, event)
+            # if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
+                # evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                # if event.value == "PRESS":
+# #                    print("--left mouse pressed")
+                    # self.layout.mouse_pressed(evt)
+                    # self.mouse_capture = True
+                # else:
+                    # self.layout.mouse_released(evt)
+                    # self.mouse_capture = False
+                
+                # #All mouse events within window bounds return True
+                # return True
+    
+        # elif event.type == 'RIGHTMOUSE':
+            # mouse_pos = self.mouse_pos(context, event)
+            # if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                # evt = MouseButtonEvent(mouse_button = MouseButton.RIGHT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                # if event.value == "PRESS":
+                    # self.layout.mouse_pressed(evt)
+                # else:
+                    # self.layout.mouse_released(evt)
+                
+                # #All mouse events within window bounds return True
+                # return True
+    
+        # elif event.type == 'MIDDLEMOUSE':
+            # mouse_pos = self.mouse_pos(context, event)
+            # if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                # evt = MouseButtonEvent(mouse_button = MouseButton.MIDDLE, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                # if event.value == "PRESS":
+                    # self.layout.mouse_pressed(evt)
+                # else:
+                    # self.layout.mouse_released(evt)
+                
+                # #All mouse events within window bounds return True
+                # return True
     
         # result = self.layout.handle_event(context, event)
         # if result:

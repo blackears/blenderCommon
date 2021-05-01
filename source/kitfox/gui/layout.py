@@ -53,6 +53,8 @@ class Rectangle2D:
     def __str__(self):
         return str(self.x) + ", " + str(self.y) + ", " + str(self.width) + ", " + str(self.height)
 
+        
+
 #----------------------------------
 
 class Layout:
@@ -132,6 +134,7 @@ class LayoutBox(Layout):
 
         for child in self.children:
             child.dump(indent + " ")
+
         
     def add_child(self, child):
         self.children.append(child)
@@ -287,6 +290,27 @@ class LayoutBox(Layout):
     def draw(self, ctx):
         for child in self.children:
             child.draw(ctx)
+
+    def pick_panel_stack(self, pos):
+        for child in self.children:
+            child_pos = child.position
+            
+            #Bounds relative to parent
+            bounds = child.bounds()
+            
+#            print ("testing bounds " + str(bounds))
+            if bounds.contains(pos[0], pos[1]):
+#                print ("bounds test passed")
+            
+                rel_pos = pos - child_pos
+                result = child.pick_panel_stack(rel_pos)
+                
+                # if result:
+                    # return True
+                result.insert(0, child)
+                return result
+            
+        return []
 
     def mouse_pressed(self, event):
         # print ("layout mouse_pressed")
