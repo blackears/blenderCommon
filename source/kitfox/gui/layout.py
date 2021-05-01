@@ -289,8 +289,8 @@ class LayoutBox(Layout):
             child.draw(ctx)
 
     def mouse_pressed(self, event):
-        print ("layout mouse_pressed")
-        print ("in event " + str(event))
+        # print ("layout mouse_pressed")
+        # print ("in event " + str(event))
     
         for child in self.children:
             pos = child.position
@@ -298,9 +298,9 @@ class LayoutBox(Layout):
             #Bounds relative to parent
             bounds = child.bounds()
             
-            print ("testing bounds " + str(bounds))
+#            print ("testing bounds " + str(bounds))
             if bounds.contains(event.pos[0], event.pos[1]):
-                print ("bounds test passed")
+#                print ("bounds test passed")
             
                 evt = event.copy()
                 evt.pos -= pos

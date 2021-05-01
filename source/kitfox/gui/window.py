@@ -58,6 +58,89 @@ class FoldoutPanel(Panel):
         super().__init__()
         self.position = Vector((0, 0))
 
+
+
+
+#----------------------------------
+
+class TitleBar(Label):
+    def __init__(self, window):
+        super().__init__()
+        self.window = window
+        self.dragging = False
+
+
+    def mouse_pressed(self, event):
+        self.dragging = True
+        self.drag_start = event.screen_pos
+        self.window_start = self.window.position.copy()
+
+        # print ("TextINput pressed")
+        # print("event.pos" + str(event.pos))
+        # print("event.screen_pos" + str(event.screen_pos))
+        return True
+        
+    def mouse_released(self, event):
+        self.dragging = False
+
+        # print ("TextINput released")
+        # print("event.pos" + str(event.pos))
+        # print("event.screen_pos" + str(event.screen_pos))
+        return True
+        
+    def mouse_moved(self, event):
+        if self.dragging:
+            offset = event.screen_pos - self.drag_start
+            self.window.position = self.window_start + offset
+    
+        return True
+
+
+    # def mouse_click(self, context, event):
+        # c2s = self.coords_to_screen_matrix(context)
+        # s2c = c2s.inverted()
+        # mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+
+        # # print ("event.mouse_region_x " + str(event.mouse_region_x))
+        # # print ("event.mouse_region_y " + str(event.mouse_region_y))
+        # # print ("mouse_pos " + str(mouse_pos))
+        
+        # bounds = self.bounds()
+        
+        # # print ("bounds " + str(bounds))
+        
+        # if bounds.contains(mouse_pos.x, mouse_pos.y):
+            # if event.value == "PRESS":
+                # self.layout.dispatch_mouse_event
+            
+                # self.dragging = True
+                # self.mouse_down_pos = mouse_pos
+                # self.start_position = self.position.copy()
+            # else:
+                # self.dragging = False
+# #            return {'consumed': True}
+            # return True
+    
+# #        return {'consumed': False}
+        # return False
+        
+    # def mouse_move(self, context, event):
+        # c2s = self.coords_to_screen_matrix(context)
+        # s2c = c2s.inverted()
+        # mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+        
+        
+        # if self.dragging:
+            # offset = mouse_pos - self.mouse_down_pos
+    
+            # self.position = self.start_position + offset.to_2d()
+# #            return {'consumed': True}
+            # return True
+            
+# #        return {'consumed': False}
+        # return False
+      
+
 #----------------------------------
 
 class Window:
@@ -75,10 +158,13 @@ class Window:
         
         self.layout = LayoutBox(Axis.Y)
         self.layout.set_window(self)
-        
-        self.title_panel = Label("foo")
+
+        self.title_panel = TitleBar(self)
         self.layout.add_child(self.title_panel)
         self.title_panel.set_font_size(60)
+        # self.title_panel = Label("foo")
+        # self.layout.add_child(self.title_panel)
+        # self.title_panel.set_font_size(60)
         
         self.main_panel = Panel()
         self.layout.add_child(self.main_panel)
@@ -86,11 +172,13 @@ class Window:
         self.main_panel.expansion_type_y = ExpansionType.EXPAND
         
         
-        self.set_title("")
+#        self.set_title("")
 #        print("title panel " + str(self.title_panel.bounds()))
 #        print("main panel " + str(self.main_panel.bounds()))
 
         self.layout.layout_components(self.bounds())
+        
+        self.mouse_capture = False
 
     def get_title(self):
         return self.__title
@@ -203,17 +291,36 @@ class Window:
         
     def handle_event(self, context, event):
         bounds = self.bounds()
+
+        # if event.type == 'LEFTMOUSE':
+            # mouse_pos = self.mouse_pos(context, event)
+            
+            
+            # if self.capture_panel != None:
+                
+            # elif bounds.contains(mouse_pos[0], mouse_pos[1]):
+                # evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                # if event.value == "PRESS":
+                    # panel_stack = self.layout.pick_panel(mouse_pos)
+                    
+                    # local_pos = mouse_pos - self.position
+                    # for panel in panel_stack:
+                        
+                        
     
         if event.type == 'LEFTMOUSE':
             mouse_pos = self.mouse_pos(context, event)
-            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+            if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
                 evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
 
                 if event.value == "PRESS":
-                    print("--left mouse pressed")
+#                    print("--left mouse pressed")
                     self.layout.mouse_pressed(evt)
+                    self.mouse_capture = True
                 else:
                     self.layout.mouse_released(evt)
+                    self.mouse_capture = False
                 
                 #All mouse events within window bounds return True
                 return True
@@ -246,7 +353,7 @@ class Window:
         
         elif event.type == 'MOUSEMOVE':
             mouse_pos = self.mouse_pos(context, event)
-            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+            if self.mouse_capture or bounds.contains(mouse_pos[0], mouse_pos[1]):
                 evt = MouseButtonEvent(mouse_button = MouseButton.UNKNOWN, pos = mouse_pos - self.position, screen_pos = mouse_pos)
 
                 self.layout.mouse_moved(evt)
