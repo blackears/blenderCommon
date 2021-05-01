@@ -52,6 +52,7 @@ class AlignY(Enum):
 
 class Panel:
     def __init__(self):
+        self.parent_layout = None
         self.background_color = None
         self.border_radius = 0
         self.border_color = None
@@ -79,6 +80,12 @@ class Panel:
         print(indent + "Panel " + str(self.bounds()))
         if self.layout != None:
             self.layout.dump(indent + " ")
+      
+    def get_parent_layout(self):
+        return self.parent_layout
+      
+    def set_parent_layout(self, value):
+        self.parent_layout = value
       
     def set_expansion_x(self, value):
         self.expansion_type_x = value
@@ -113,8 +120,20 @@ class Panel:
         
     def set_layout(self, layout):
         self.layout = layout
+        layout.set_parent(self)
         
     def bounds(self):
+        return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
+        
+    def bounds_world(self):
+        if parent_layout != None:
+            window = parent_layout.get_window()
+            if window != None:
+                pass
+            
+            parent = parent_layout.get_parent()
+            if parent != None:
+                parent.position
         return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
         
     def calc_minimum_size(self):
@@ -176,3 +195,53 @@ class Panel:
             ctx.set_color(self.background_color)
             ctx.fill_round_rectangle(x, y, w, h, self.border_radius)
 
+    def handle_event_dispatch(self, context, event):
+        if self.layout != None:
+            result = self.layout.handle_event(context_event)
+            if result:
+                return True
+                
+        return handle_event(context, event)
+
+    # def handle_event(self, context, event):
+        # return False
+
+    def get_screen_position(self):
+        pos = self.position.copy()
+    
+        if self.parent_layout != None:
+            pos += self.parent_layout.get_screen_position()
+
+        return pos
+        
+    def get_parent_panel():
+        if self.parent_layout != None:
+            return self.parnt_layout.get_parent()
+        return None
+
+    def mouse_pressed(self, event):
+        if self.layout != None:
+            result = self.layout.mouse_pressed(event)
+            if result:
+                return True
+            
+        return False
+        
+    def mouse_released(self, event):
+        if self.layout != None:
+            result = self.layout.mouse_released(event)
+            if result:
+                return True
+                
+        return False
+        
+    def mouse_moved(self, event):
+        if self.layout != None:
+            result = self.layout.mouse_moved(event)
+            if result:
+                return True
+                
+        return False
+        
+        
+        

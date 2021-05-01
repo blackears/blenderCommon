@@ -32,6 +32,7 @@ from .graphics import DrawContext2D
 from .layout import *
 from .panel import *
 from .label import *
+from .events import *
 
 #----------------------------------
 
@@ -49,12 +50,6 @@ from .label import *
 
 
 
-
-#----------------------------------
-
-class TextInput(Label):
-    def __init__(self, text = "label"):
-        super().__init__(text)
 
 #----------------------------------
 
@@ -79,6 +74,7 @@ class Window:
         self.dragging = False
         
         self.layout = LayoutBox(Axis.Y)
+        self.layout.set_window(self)
         
         self.title_panel = Label("foo")
         self.layout.add_child(self.title_panel)
@@ -105,47 +101,56 @@ class Window:
 
     def get_main_panel(self):
         return self.main_panel
+
+    def get_screen_position(self):
+        return self.position.copy()
         
     def bounds(self):
         return Rectangle2D(self.position.x, self.position.y, self.size.x, self.size.y)
             
-    def mouse_click(self, context, event):
-        c2s = self.coords_to_screen_matrix(context)
-        s2c = c2s.inverted()
-        mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+    # def mouse_click(self, context, event):
+        # c2s = self.coords_to_screen_matrix(context)
+        # s2c = c2s.inverted()
+        # mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
 
-        # print ("event.mouse_region_x " + str(event.mouse_region_x))
-        # print ("event.mouse_region_y " + str(event.mouse_region_y))
-        # print ("mouse_pos " + str(mouse_pos))
+        # # print ("event.mouse_region_x " + str(event.mouse_region_x))
+        # # print ("event.mouse_region_y " + str(event.mouse_region_y))
+        # # print ("mouse_pos " + str(mouse_pos))
         
-        bounds = self.bounds()
+        # bounds = self.bounds()
         
-        # print ("bounds " + str(bounds))
+        # # print ("bounds " + str(bounds))
         
-        if bounds.contains(mouse_pos.x, mouse_pos.y):
-            if event.value == "PRESS":
-                self.dragging = True
-                self.mouse_down_pos = mouse_pos
-                self.start_position = self.position.copy()
-            else:
-                self.dragging = False
-            return {'consumed': True}
-    
-        return {'consumed': False}
-        
-    def mouse_move(self, context, event):
-        c2s = self.coords_to_screen_matrix(context)
-        s2c = c2s.inverted()
-        mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
-        
-        
-        if self.dragging:
-            offset = mouse_pos - self.mouse_down_pos
-    
-            self.position = self.start_position + offset.to_2d()
-            return {'consumed': True}
+        # if bounds.contains(mouse_pos.x, mouse_pos.y):
+            # if event.value == "PRESS":
+                # self.layout.dispatch_mouse_event
             
-        return {'consumed': False}
+                # self.dragging = True
+                # self.mouse_down_pos = mouse_pos
+                # self.start_position = self.position.copy()
+            # else:
+                # self.dragging = False
+# #            return {'consumed': True}
+            # return True
+    
+# #        return {'consumed': False}
+        # return False
+        
+    # def mouse_move(self, context, event):
+        # c2s = self.coords_to_screen_matrix(context)
+        # s2c = c2s.inverted()
+        # mouse_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+        
+        
+        # if self.dragging:
+            # offset = mouse_pos - self.mouse_down_pos
+    
+            # self.position = self.start_position + offset.to_2d()
+# #            return {'consumed': True}
+            # return True
+            
+# #        return {'consumed': False}
+        # return False
       
     def coords_to_screen_matrix(self, context):
         region = context.region
@@ -190,17 +195,76 @@ class Window:
         self.layout.draw(ctx)
 
         
-    def handle_event(self, context, event):
+    def mouse_pos(self, context, event):
+        c2s = self.coords_to_screen_matrix(context)
+        s2c = c2s.inverted()
+        screen_pos = s2c @ Vector((event.mouse_region_x, event.mouse_region_y, 0, 1))
+        return screen_pos.to_2d()
         
+    def handle_event(self, context, event):
+        bounds = self.bounds()
+    
         if event.type == 'LEFTMOUSE':
-            return self.mouse_click(context, event)
+            mouse_pos = self.mouse_pos(context, event)
+            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                if event.value == "PRESS":
+                    print("--left mouse pressed")
+                    self.layout.mouse_pressed(evt)
+                else:
+                    self.layout.mouse_released(evt)
+                
+                #All mouse events within window bounds return True
+                return True
+    
+        elif event.type == 'RIGHTMOUSE':
+            mouse_pos = self.mouse_pos(context, event)
+            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                evt = MouseButtonEvent(mouse_button = MouseButton.RIGHT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                if event.value == "PRESS":
+                    self.layout.mouse_pressed(evt)
+                else:
+                    self.layout.mouse_released(evt)
+                
+                #All mouse events within window bounds return True
+                return True
+    
+        elif event.type == 'MIDDLEMOUSE':
+            mouse_pos = self.mouse_pos(context, event)
+            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                evt = MouseButtonEvent(mouse_button = MouseButton.MIDDLE, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                if event.value == "PRESS":
+                    self.layout.mouse_pressed(evt)
+                else:
+                    self.layout.mouse_released(evt)
+                
+                #All mouse events within window bounds return True
+                return True
         
         elif event.type == 'MOUSEMOVE':
-            return self.mouse_move(context, event)
+            mouse_pos = self.mouse_pos(context, event)
+            if bounds.contains(mouse_pos[0], mouse_pos[1]):
+                evt = MouseButtonEvent(mouse_button = MouseButton.UNKNOWN, pos = mouse_pos - self.position, screen_pos = mouse_pos)
+
+                self.layout.mouse_moved(evt)
+                
+                #All mouse events within window bounds return True
+                return True
+    
+        # result = self.layout.handle_event(context, event)
+        # if result:
+            # return True
+        
+        # if event.type == 'LEFTMOUSE':
+            # return self.mouse_click(context, event)
+        
+        # elif event.type == 'MOUSEMOVE':
+            # return self.mouse_move(context, event)
             
         
-        
-#        return {'CONSUMED'}
-        return {'consumed': False}
+        return False
         
         

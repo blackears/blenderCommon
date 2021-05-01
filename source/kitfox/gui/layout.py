@@ -58,13 +58,46 @@ class Rectangle2D:
 class Layout:
 
     def __init__(self):
-        pass
+        self.parent = None
+        self.window = None
+
+    def get_parent(self):
+        return self.parent
+
+    def set_parent(self, parent):
+        self.parent = parent
+
+    def get_window(self):
+        return self.window
+
+    def set_window(self, window):
+        self.window = window
         
     def layout_components(self, bounds):
         pass
 
     def draw(self, ctx):
         pass
+        
+    def handle_event(self, context, event):
+        return False
+
+    def get_screen_position(self):
+        if self.parent != None:
+            return self.parent.get_screen_position()
+        elif self.window != None:
+            return self.window.get_screen_position()
+        return Vector((0, 0))
+
+    def mouse_pressed(self, event):
+        return False
+
+    def mouse_released(self, event):
+        return False
+
+    def mouse_moved(self, event):
+        return False
+        
 #----------------------------------
 
 class LayoutAxis(Enum):
@@ -102,6 +135,15 @@ class LayoutBox(Layout):
         
     def add_child(self, child):
         self.children.append(child)
+        child.set_parent_layout(self)
+        
+    def handle_event(self, context, event):
+        for child in self.children:
+            result = child.handle_event_dispatch(context, event)
+            if result:
+                return True
+    
+        return False
 
     def calc_minimum_size(self):
         span_x = 0
@@ -245,3 +287,58 @@ class LayoutBox(Layout):
     def draw(self, ctx):
         for child in self.children:
             child.draw(ctx)
+
+    def mouse_pressed(self, event):
+        print ("layout mouse_pressed")
+        print ("in event " + str(event))
+    
+        for child in self.children:
+            pos = child.position
+            
+            #Bounds relative to parent
+            bounds = child.bounds()
+            
+            print ("testing bounds " + str(bounds))
+            if bounds.contains(event.pos[0], event.pos[1]):
+                print ("bounds test passed")
+            
+                evt = event.copy()
+                evt.pos -= pos
+                result = child.mouse_pressed(evt)
+                
+                if result:
+                    return True
+            
+        return False
+
+    def mouse_released(self, event):
+        for child in self.children:
+            pos = child.position
+            
+            #Bounds relative to parent
+            bounds = child.bounds()
+            if bounds.contains(event.pos[0], event.pos[1]):
+            
+                evt = event.copy()
+                evt.pos -= pos
+                result = child.mouse_released(evt)
+                if result:
+                    return True
+
+        return False
+        
+    def mouse_moved(self, event):
+        for child in self.children:
+            pos = child.position
+            
+            #Bounds relative to parent
+            bounds = child.bounds()
+            if bounds.contains(event.pos[0], event.pos[1]):
+            
+                evt = event.copy()
+                evt.pos -= pos
+                result = child.mouse_moved(evt)
+                if result:
+                    return True
+
+        return False
