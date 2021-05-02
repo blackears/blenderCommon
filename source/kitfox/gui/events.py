@@ -34,7 +34,6 @@ from enum import Enum
 #----------------------------------
 
 class MouseButton(Enum):
-    UNKNOWN = 0
     LEFT = 1
     MIDDLE = 2
     RIGHT = 3
@@ -42,10 +41,17 @@ class MouseButton(Enum):
 #----------------------------------
 
 class MouseButtonEvent:
-    def __init__(self, mouse_button = MouseButton.LEFT, pos = Vector((0, 0)), screen_pos = Vector((0, 0))):
+    def __init__(self, mouse_button = None, pos = Vector((0, 0)), screen_pos = Vector((0, 0)), left_down = False, middle_down = False, right_down = False, shift_down = False, ctrl_down = False, alt_down = False):
         self.mouse_button = mouse_button
         self.pos = pos.copy()
         self.screen_pos = screen_pos.copy()
+        self.left_down = left_down
+        self.middle_down = middle_down
+        self.right_down = right_down
+
+        self.shift_down = shift_down
+        self.ctrl_down = ctrl_down
+        self.alt_down = alt_down
         
     def copy(self):
         return MouseButtonEvent(self.mouse_button, self.pos, self.screen_pos)
