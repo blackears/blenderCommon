@@ -168,7 +168,7 @@ class PanelStack:
 class Window:
     def __init__(self):
         self.position = Vector((100, 40))
-        self.size = Vector((400, 400))
+        self.size = Vector((200, 400))
 
         self.background_color = Vector((.5, .5, .5, 1))
         self.font_color = Vector((1, 1, 1, 1))
@@ -314,6 +314,8 @@ class Window:
                     if self.mouse_left_down == False and self.mouse_middle_down == False and self.mouse_right_down == False:
 #                        print("END capture")
                         self.captured_panel_stack = None
+                        
+                    return True
                 
             elif bounds.contains(mouse_pos[0], mouse_pos[1]):
                 #evt = MouseButtonEvent(mouse_button = MouseButton.LEFT, pos = mouse_pos - self.position, screen_pos = mouse_pos)
@@ -339,7 +341,7 @@ class Window:
                     )
                     self.captured_panel_stack.stack[-1].mouse_pressed(evt)
                       
-            return True
+                    return True
     
         
         elif event.type == 'MOUSEMOVE':
@@ -361,6 +363,8 @@ class Window:
                 )
                 
                 self.captured_panel_stack.stack[-1].mouse_dragged(evt)
+                
+                return True
             
             elif bounds.contains(mouse_pos[0], mouse_pos[1]):
 #                print("mouse MOVE")
@@ -379,6 +383,8 @@ class Window:
                     alt_down = event.alt
                 )
                 stack.stack[-1].mouse_moved(evt)
+                
+                return True
         
         return False
         
