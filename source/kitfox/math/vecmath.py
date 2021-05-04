@@ -739,14 +739,176 @@ class Bounds:
     def include_bounds(self, bounds):
         include_point(bounds.minBound)
         include_point(bounds.maxBound)
+
+    def __intersect_edge(self, p0, p1, ray_origin, ray_dir, ray_radius):
+        dir = p1 - p0
+        s = closest_point_to_line(p0, dir, ray_origin, ray_dir)
+        if math.isnan(s):
+            return False
+        # print("ray_origin " + str(ray_origin))
+        # print("ray_dir " + str(ray_dir))
+        # print("ray_radius " + str(ray_radius))
+            
+        # print("p0 " + str(p0))
+        # print("p1 " + str(p1))
+        # print("s " + str(s))
+        
+        s = max(min(s, 1), 0)
+        p = p0 + s * dir
+
+        # print("p " + str(p))
+        
+        offset_from_ray_origin = p - ray_origin
+        offset_parallel = offset_from_ray_origin.project(ray_dir)
+        offset_perp = offset_from_ray_origin - offset_parallel
+
+        # print("offset_perp " + str(offset_perp))
+        # print("offset_perp.length " + str(offset_perp.length))
+        
+        if offset_perp.dot(offset_perp) < ray_radius * ray_radius:
+            #We intersect with cube edge
+            return True
+        return False
+
+    def __intersect_face(self, p0, p1, p2, ray_origin, ray_dir):
+        # print ("__intersect_face ")
+        # print("p0 " + str(p0))
+        # print("p1 " + str(p1))
+        # print("p2 " + str(p2))
+        # print("ray_origin " + str(ray_origin))
+        # print("ray_dir " + str(ray_dir))
     
+        v1 = p1 - p0
+        v2 = p2 - p0
+        normal = v1.cross(v2)
+        s = isect_line_plane(ray_origin, ray_dir, p0, normal)
+        if s == None:
+            #Parallel to face
+            return False
+        hit = ray_origin + s * ray_dir
+        v_hit = hit - p0
+
+#        print("hit " + str(hit))
+        
+        #Express v_hit as a linear combination of v1 and v2
+#        V = mathutils.Matrix(((v1.x, v2.x, normal.x), (v1.y, v2.y, normal.y), (v1.z, v2.z, normal.z)))
+        V = mathutils.Matrix((v1, v2, normal))
+        V.transpose()
+        V_i = V.inverted()
+        co = V_i @ v_hit
+        
+        if co.x >= 0 and co.x <= 1 and co.y >= 0 and co.y <= 1:
+            return True
+        
+        return False
+
+    def intersect_with_ray(self, ray_origin, ray_dir, ray_radius = 0, boundsXform = None):
+        p000 = mathutils.Vector((self.minBound.x, self.minBound.y, self.minBound.z))
+        p001 = mathutils.Vector((self.minBound.x, self.minBound.y, self.maxBound.z))
+        p010 = mathutils.Vector((self.minBound.x, self.maxBound.y, self.minBound.z))
+        p011 = mathutils.Vector((self.minBound.x, self.maxBound.y, self.maxBound.z))
+        p100 = mathutils.Vector((self.maxBound.x, self.minBound.y, self.minBound.z))
+        p101 = mathutils.Vector((self.maxBound.x, self.minBound.y, self.maxBound.z))
+        p110 = mathutils.Vector((self.maxBound.x, self.maxBound.y, self.minBound.z))
+        p111 = mathutils.Vector((self.maxBound.x, self.maxBound.y, self.maxBound.z))
+        
+        # print("p000 " + str(p000))
+        # print("p001 " + str(p001))
+        # print("p010 " + str(p010))
+        # print("p011 " + str(p011))
+        # print("p100 " + str(p100))
+        # print("p101 " + str(p101))
+        # print("p110 " + str(p110))
+        # print("p111 " + str(p111))
+        
+        if boundsXform != None:
+            p000 = boundsXform @ p000
+            p001 = boundsXform @ p001
+            p010 = boundsXform @ p010
+            p011 = boundsXform @ p011
+            p100 = boundsXform @ p100
+            p101 = boundsXform @ p101
+            p110 = boundsXform @ p110
+            p111 = boundsXform @ p111
+
+        # print("after xform")
+        # print("p000 " + str(p000))
+        # print("p001 " + str(p001))
+        # print("p010 " + str(p010))
+        # print("p011 " + str(p011))
+        # print("p100 " + str(p100))
+        # print("p101 " + str(p101))
+        # print("p110 " + str(p110))
+        # print("p111 " + str(p111))
+        
+        #Check for edge intersections
+        if ray_radius > 0:
+            if self.__intersect_edge(p000, p100, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p000, p010, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p010, p110, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p100, p110, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p000, p001, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p100, p101, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p010, p011, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p110, p111, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p001, p101, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p001, p011, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p011, p111, ray_origin, ray_dir, ray_radius):
+                return True
+            if self.__intersect_edge(p101, p111, ray_origin, ray_dir, ray_radius):
+                return True
+        
+        if self.__intersect_face(p000, p010, p100, ray_origin, ray_dir):
+            return True
+        if self.__intersect_face(p000, p001, p100, ray_origin, ray_dir):
+            return True
+        if self.__intersect_face(p100, p101, p110, ray_origin, ray_dir):
+            return True
+        if self.__intersect_face(p010, p110, p011, ray_origin, ray_dir):
+            return True
+        if self.__intersect_face(p000, p001, p010, ray_origin, ray_dir):
+            return True
+        if self.__intersect_face(p001, p101, p011, ray_origin, ray_dir):
+            return True
+        
+        return False
+        
+    def __str__(self):
+        return "bounds [" + str(self.minBound) + " " + str(self.maxBound) + "]"
+
+def mesh_bounds_fast(obj, world = False):
+    bounds = None
+    
+#    print("mesh_bounds_fast()")
+    for co in obj.bound_box:
+        pos = mathutils.Vector(co)
+
+#        print("pos " + str(pos))
+
+        if world:
+            pos = obj.matrix_world @ pos
+            
+        if bounds == None:
+            bounds = Bounds(pos)
+        else:
+            bounds.include_point(pos)
+    
+    return bounds
     
 def mesh_bounds(obj, world = True, selected_faces_only = False):
-    
+
     bounds = None
 
-    # minCo = None
-    # maxCo = None
     mesh = obj.data
 
     for p in mesh.polygons:
@@ -764,18 +926,6 @@ def mesh_bounds(obj, world = True, selected_faces_only = False):
                 bounds = Bounds(pos)
             else:
                 bounds.include_point(pos)
-
-    
-    # for v in mesh.vertices:
-        # pos = mathutils.Vector(v.co)
-        # if world:
-            # pos = obj.matrix_world @ pos
-    
-        # if bounds == None:
-            # bounds = Bounds(pos)
-        # else:
-            # bounds.include_point(pos)
-    
             
     return bounds
 
@@ -798,19 +948,6 @@ def bmesh_bounds(obj, bmesh, world = True, selected_faces_only = False):
                 bounds = Bounds(pos)
             else:
                 bounds.include_point(pos)
-
-    
-    # for v in bmesh.verts:
-        # pos = mathutils.Vector(v.co)
-        # if world:
-            # pos = obj.matrix_world @ pos
-    
-# #            print("pos " + str(pos))
-
-        # if bounds == None:
-            # bounds = Bounds(pos)
-        # else:
-            # bounds.include_point(pos)
      
     return bounds
 
