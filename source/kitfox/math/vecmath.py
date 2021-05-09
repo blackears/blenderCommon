@@ -20,6 +20,7 @@ import mathutils
 import math
 from bpy_extras import view3d_utils
 from enum import Enum
+import numpy as np
 
 
 vecX = mathutils.Vector((1, 0, 0))
@@ -721,6 +722,107 @@ def intersect_triangle(p0, p1, p2, pickOrigin, pickRay):
     
     return hitPoint
     
+#Finds the vector x such the function f(x) = A @ x - b is minimized.
+#  A and b must be numpy matricies and have the same number of rows.
+#  return value is a numpy vector
+def least_squares_fit(A, b):
+    aa = A.T @ A
+    
+    if np.isfinite(np.linalg.cond(aa)):
+        aa = np.linalg.inv(aa)
+    else:
+        return (False, [])
+    
+    x = aa @ A.T @ b
+    
+    return (True, x)
+
+# #points is an array of 3D points.
+# #  @returns [point, normal] of plane that best fits points
+# def fit_points_to_plane(points):
+    # P = np.array(points)
+    # rows = P.shape[0]
+    
+    # ones = np.ones(rows).reshape((rows, 1))
+    
+    # aa = P[:, 0:-1]
+    # A = np.hstack((aa, ones))
+    
+    # b = P[:, -1]
+    
+    # valid, C = least_squares_fit(A, b)
+    # if valid == False:
+        # return (False, vecZero, vecZero)
+    # pos = mathutils.Vector((0, 0, C[2]))
+    
+    # norm = mathutils.Vector((C[0], C[1], -1))
+    # norm.normalize()
+    
+    # return (True, pos, norm)
+
+#points is an array of 3D points.
+#  @returns [point, normal] of plane that best fits points
+def fit_points_to_plane(points):
+    P = np.array(points)
+    rows = P.shape[0]
+    
+    centroid = P.sum(axis=0) / rows
+
+    #Centered points
+    Pc = P - centroid
+    
+    ones = np.ones(rows).reshape((rows, 1))
+    
+    # aa = P[:, 0:-1]
+    # A = np.hstack((aa, ones))
+    A = Pc[:, 0:-1]
+    
+    b = P[:, -1]
+    
+    valid, C = least_squares_fit(A, b)
+    if valid == False:
+        return (False, vecZero, vecZero)
+    pos = mathutils.Vector(centroid)
+    
+    norm = mathutils.Vector((C[0], C[1], -1))
+    norm.normalize()
+    
+    return (True, pos, norm)
+
+# #points is an array of 3D points.
+# #  @returns [point, normal] of plane that best fits points
+# def fit_points_to_plane2(points):
+    # #Equation of plane we're trying to fit is ax + by + cz + d = 0
+    # # <a, b, c> is the normal of the plane
+
+    # P = np.array(points)
+    # rows = P.shape[0]
+    
+    # centroid = P.sum(axis=0) / rows
+
+    # #Centered points
+    # Pc = P - centroid
+    
+# #    ones = np.ones(rows).reshape((rows, 1))
+    
+# #    A = np.hstack((P, ones))
+    # A = Pc
+    
+# #    b = P[:, -1]
+    # b = np.zeros(rows).reshape((rows, 1))
+    
+    # #Coefficients of ax + by + cz + d = 0
+    # valid, C = least_squares_fit(A, b)
+    # if valid == False:
+        # return (False, vecZero, vecZero)
+    
+    # #Point on plane where x = 0, y = 0
+    # pos = mathutils.Vector(centroid)
+    
+    # norm = mathutils.Vector((C[0], C[1], C[2]))
+    # norm.normalize()
+    
+    # return (True, pos, norm)
 
 
 class Bounds:
@@ -793,6 +895,9 @@ class Bounds:
         #Express v_hit as a linear combination of v1 and v2
 #        V = mathutils.Matrix(((v1.x, v2.x, normal.x), (v1.y, v2.y, normal.y), (v1.z, v2.z, normal.z)))
         V = mathutils.Matrix((v1, v2, normal))
+        if V.determinant() == 0:
+            return False
+        
         V.transpose()
         V_i = V.inverted()
         co = V_i @ v_hit
