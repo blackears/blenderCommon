@@ -722,6 +722,43 @@ def intersect_triangle(p0, p1, p2, pickOrigin, pickRay):
     
     return hitPoint
     
+#Finds point in a list of points most distant from a given point
+#  return most distant point in the list
+def most_distant_point(point, vert_list):
+    best_dist_sq = 0
+    best_point = None
+    
+    for p in vert_list:
+        dist_sq = (point - p).length_squared
+        if dist_sq > best_dist_sq:
+            best_dist_sq = dist_sq
+            best_point = p
+            
+    return best_point
+
+    
+#Finds approximate bounding sphere for a set of points using Ritter's Bounding Sphere algorithm
+#  return a list of (origin: Vector, radius: float) describing sphere
+def bounding_sphere(vert_list):
+    x = vert_list[0]
+    y = most_distant_point(x, vert_list)
+    z = most_distant_point(y, vert_list)
+    
+    #initial guess
+    sphere_center = (y + z) / 2
+    sphere_radius_sq = (sphere_center - z).length_squared
+    
+    #check for outliers
+    for p in vert_list:
+        offset = p - sphere_center
+        if offset.length_squared > sphere_radius_sq:
+            opposite_p = sphere_center - offset.normalized() * math.sqrt(sphere_radius_sq)
+            sphere_center = (opposite_p + p) / 2
+            sphere_radius_sq = (p - sphere_center).length_squared
+            
+    return (sphere_center, math.sqrt(sphere_radius_sq))
+        
+    
 #Finds the vector x such the function f(x) = A @ x - b is minimized.
 #  A and b must be numpy matricies and have the same number of rows.
 #  return value is a numpy vector
